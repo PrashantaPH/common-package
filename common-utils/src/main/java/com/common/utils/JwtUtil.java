@@ -1,5 +1,7 @@
 package com.common.utils;
 
+import com.common.dto.AuthRequest;
+import com.common.dto.AuthResponse;
 import com.common.exception.InvalidAuthException;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
@@ -9,6 +11,8 @@ import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
@@ -16,7 +20,7 @@ import javax.crypto.SecretKey;
 import java.util.Date;
 import java.util.function.Function;
 
-import static com.common.utils.Constants.APIKEY_401;
+import static com.common.utils.Constants.*;
 
 @Component
 public class JwtUtil {
@@ -39,55 +43,49 @@ public class JwtUtil {
     @Value("${jwt.refresh-expiration}")
     private long refreshExpiration; // in seconds
 
-//    // ------------------- Token Generation -------------------
-//    public AuthResponse generateToken(AuthRequest authRequest) {
-//        validateApiKey(authRequest.getApiKey());
-//
-//        AuthResponse response = new AuthResponse();
-////        try {
-//        Authentication authentication = authenticationManager.authenticate(
-//                new UsernamePasswordAuthenticationToken(authRequest.getUsername(), authRequest.getPassword())
-//        );
-//
-//        if (authentication.isAuthenticated()) {
-//            String accessToken = generateAccessToken(authRequest.getUsername());
-//            String refreshToken = generateRefreshToken(authRequest.getUsername());
-//
-//            response.setResult(SUCCESS);
-//            response.setActive(true);
-//            response.setAccessToken(accessToken);
-//            response.setExpiresIn(accessExpiration);
-//            response.setRefreshToken(refreshToken);
-//            response.setRefreshExpiresIn(refreshExpiration);
-//            return response;
-//        } else {
-//            throw new InvalidAuthException("User is not authorized. Please check your credentials.", AUTH_401);
-//        }
-////        } catch (BadCredentialsException ex) {
-////            throw new InvalidAuthException("Invalid credentials for user: " + authRequest.getUsername(), AUTH_401);
-////        } catch (Exception ex) {
-//        //            throw new ApplicationException("Technical error occurred while generating token", AUTH_500);
-////        }
-//    }
-//
-//    // ------------------- Token Validation -------------------
-//    public AuthResponse validateToken(String token, String apiKey) {
-//        validateApiKey(apiKey);
-//
-//        if (token != null && token.startsWith(BEARER)) {
-//            token = token.substring(7);
-//        }
-//
-//        boolean isExpired = isTokenExpired(token);
-//        String username = extractUsername(token);
-//
-//        AuthResponse response = new AuthResponse();
-//        response.setResult(isExpired ? EXPIRED : VALID);
-//        response.setActive(!isExpired);
-//        response.setAccessToken(token);
-//        response.setExpiresIn(calculateExpireIn(token));
-//        return response;
-//    }
+    // ------------------- Token Generation -------------------
+    public AuthResponse generateToken(AuthRequest authRequest) {
+        validateApiKey(authRequest.getApiKey());
+
+        AuthResponse response = new AuthResponse();
+        Authentication authentication = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(authRequest.getUsername(), authRequest.getPassword())
+        );
+
+        if (authentication.isAuthenticated()) {
+            String accessToken = generateAccessToken(authRequest.getUsername());
+            String refreshToken = generateRefreshToken(authRequest.getUsername());
+
+            response.setResult(SUCCESS);
+            response.setActive(true);
+            response.setAccessToken(accessToken);
+            response.setExpiresIn(accessExpiration);
+            response.setRefreshToken(refreshToken);
+            response.setRefreshExpiresIn(refreshExpiration);
+            return response;
+        } else {
+            throw new InvalidAuthException("User is not authorized. Please check your credentials.", AUTH_401);
+        }
+    }
+
+    // ------------------- Token Validation -------------------
+    public AuthResponse validateToken(String token, String apiKey) {
+        validateApiKey(apiKey);
+
+        if (token != null && token.startsWith(BEARER)) {
+            token = token.substring(7);
+        }
+
+        boolean isExpired = isTokenExpired(token);
+        String username = extractUsername(token);
+
+        AuthResponse response = new AuthResponse();
+        response.setResult(isExpired ? EXPIRED : VALID);
+        response.setActive(!isExpired);
+        response.setAccessToken(token);
+        response.setExpiresIn(calculateExpireIn(token));
+        return response;
+    }
 
     // ------------------- Claims Extraction -------------------
     public String extractUsername(String token) {

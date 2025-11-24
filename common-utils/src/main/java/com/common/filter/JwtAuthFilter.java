@@ -19,15 +19,13 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
-import static com.common.utils.Constants.AUTHORIZATION;
-import static com.common.utils.Constants.BEARER;
-import static com.common.utils.Constants.TOKEN_401;
+import static com.common.utils.Constants.*;
+
 
 @Component
 public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
-
     private final UserDetailsServiceImpl userDetailsService;
 
     public JwtAuthFilter(JwtUtil jwtUtil, @Lazy UserDetailsServiceImpl userDetailsService) {
@@ -36,33 +34,32 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     }
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
-        String authHeader = request.getHeader(AUTHORIZATION);
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+            throws ServletException, IOException {
 
+        String path = request.getRequestURI();
+        if (PUBLIC_ENDPOINTS.stream().anyMatch(path::startsWith)) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        String authHeader = request.getHeader(AUTHORIZATION);
         if (authHeader != null && authHeader.startsWith(BEARER)) {
-            String token = authHeader.substring(BEARER.length()); // "Bearer " is 7 chars
+            String token = authHeader.substring(BEARER.length());
             String username = jwtUtil.extractUsername(token);
 
             if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                 UserDetails userDetails = userDetailsService.loadUserByUsername(username);
 
-                if (jwtUtil.validateToken(token, userDetails)) {
+                if (Boolean.TRUE.equals(jwtUtil.validateToken(token, userDetails))) {
                     UsernamePasswordAuthenticationToken authenticationToken =
-                            new UsernamePasswordAuthenticationToken(
-                                    userDetails,
-                                    null,
-                                    userDetails.getAuthorities()
-                            );
+                            new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
                     authenticationToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authenticationToken);
                 } else {
-                    // Token present but invalid/expired – raise controlled exception
                     throw new InvalidAuthException("Invalid or expired JWT token", TOKEN_401);
                 }
             }
-        } else {
-            // No Authorization header – just continue; protected endpoints will be blocked later
-            logger.debug("Authorization header missing or malformed.");
         }
 
         filterChain.doFilter(request, response);
