@@ -45,7 +45,7 @@ public class JwtUtil {
 
     // ------------------- Token Generation -------------------
     public AuthResponse generateToken(AuthRequest authRequest) {
-        validateApiKey(authRequest.getApiKey());
+//        validateApiKey(authRequest.getApiKey());
 
         AuthResponse response = new AuthResponse();
         Authentication authentication = authenticationManager.authenticate(
@@ -70,7 +70,7 @@ public class JwtUtil {
 
     // ------------------- Token Validation -------------------
     public AuthResponse validateToken(String token, String apiKey) {
-        validateApiKey(apiKey);
+//        validateApiKey(apiKey);
 
         if (token != null && token.startsWith(BEARER)) {
             token = token.substring(7);
@@ -154,7 +154,7 @@ public class JwtUtil {
     }
 
     // ------------------- API Key Validation -------------------
-    private void validateApiKey(String apiKey) {
+    public void validateApiKey(String apiKey) {
         if (!appApiKey.equals(apiKey)) {
             throw new InvalidAuthException("Invalid API Key provided", APIKEY_401);
         }

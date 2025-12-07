@@ -8,12 +8,17 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import static com.common.utils.Constants.API_KEY;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class CommonUserManagementService {
 
     private final WebClient webClient;
+
+    @Value("${app.api-key}")
+    private String appApiKey;
 
     @Value("${byEmail}")
     private String byEmail;
@@ -29,6 +34,7 @@ public class CommonUserManagementService {
 
         return webClient.get()
                 .uri(uri)
+                .header(API_KEY, appApiKey)
                 .retrieve()
                 .bodyToMono(CommonUserDetails.class)
                 .block();

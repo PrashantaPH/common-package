@@ -14,6 +14,7 @@ public class Constants {
     public static final String FAILURE = "FAILURE";
 
     public static final String BEARER = "Bearer ";
+    public static final String API_KEY = "x-api-key";
     public static final String AUTHORIZATION = "Authorization";
 
     /* Error Codes */

@@ -6,9 +6,9 @@ import com.common.service.UserDetailsServiceImpl;
 import com.common.utils.JwtUtil;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -34,34 +34,61 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     }
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
-            throws ServletException, IOException {
-
-        String path = request.getRequestURI();
-        if (PUBLIC_ENDPOINTS.stream().anyMatch(path::startsWith)) {
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
+        String path = request.getServletPath();
+        jwtUtil.validateApiKey(request.getHeader(API_KEY));
+        if (PUBLIC_ENDPOINTS.contains(path)) {
             filterChain.doFilter(request, response);
             return;
         }
+        String accessToken = null;
+        String username = null;
 
-        String authHeader = request.getHeader(AUTHORIZATION);
-        if (authHeader != null && authHeader.startsWith(BEARER)) {
-            String token = authHeader.substring(BEARER.length());
-            String username = jwtUtil.extractUsername(token);
+        /*1. Check the authorization header */
+        final String authorizationHeader = request.getHeader(AUTHORIZATION);
+        if (authorizationHeader != null && authorizationHeader.startsWith(BEARER)) {
+            accessToken = authorizationHeader.substring(7);
+        }
 
+        /*2. If not found in header, check in cookies */
+        if (accessToken == null) {
+            Cookie[] cookies = request.getCookies();
+            if (cookies != null) {
+                for (Cookie cookie : cookies) {
+                    if ("access_token".equals(cookie.getName())) {
+                        accessToken = cookie.getValue();
+                        break;
+                    }
+                }
+            }
+        }
+
+        /*3. Validate the token abd set security context */
+        if (accessToken != null) {
+            username = jwtUtil.extractUsername(accessToken);
             if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                 UserDetails userDetails = userDetailsService.loadUserByUsername(username);
-
-                if (Boolean.TRUE.equals(jwtUtil.validateToken(token, userDetails))) {
-                    UsernamePasswordAuthenticationToken authenticationToken =
+                if (Boolean.TRUE.equals(jwtUtil.validateToken(accessToken, userDetails))) {
+                    UsernamePasswordAuthenticationToken usernamePasswordAuthenticationToken =
                             new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
-                    authenticationToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                    SecurityContextHolder.getContext().setAuthentication(authenticationToken);
+                    usernamePasswordAuthenticationToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    SecurityContextHolder.getContext().setAuthentication(usernamePasswordAuthenticationToken);
                 } else {
                     throw new InvalidAuthException("Invalid or expired JWT token", TOKEN_401);
                 }
             }
         }
-
         filterChain.doFilter(request, response);
     }
+
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String uri = request.getRequestURI();
+        return "OPTIONS".equalsIgnoreCase(request.getMethod())   // preflight bypass
+                || "/error".equals(uri)         ;                     // error forward bypass
+//                || "/api/authentication/login".equals(uri)
+//                || uri.startsWith("/actuator/");
+    }
+
+
 }

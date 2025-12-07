@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Map;
 
 import static com.common.utils.Constants.FAILURE;
+import static com.common.utils.Constants.SUCCESS;
 
 public class CommonUtil {
 
@@ -35,6 +36,23 @@ public class CommonUtil {
                 .errorCode(errorCode)
                 .message(message)
                 .data(errorDetails)
+                .build();
+    }
+
+    public static ApiResponse<Object> successObject(String message) {
+        return ApiResponse.builder()
+                .apiStatus(SUCCESS)
+                .apiVersion("1.0")
+                .message(message)
+                .build();
+    }
+
+    public static ApiResponse<Object> successObject(String message, Object data) {
+        return ApiResponse.builder()
+                .apiStatus(SUCCESS)
+                .apiVersion("1.0")
+                .message(message)
+                .data(data)
                 .build();
     }
 }
