@@ -42,7 +42,6 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             return;
         }
         String accessToken = null;
-        String username = null;
 
         /*1. Check the authorization header */
         final String authorizationHeader = request.getHeader(AUTHORIZATION);
@@ -65,18 +64,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         /*3. Validate the token abd set security context */
         if (accessToken != null) {
-            username = jwtUtil.extractUsername(accessToken);
-            if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                UserDetails userDetails = userDetailsService.loadUserByUsername(username);
-                if (Boolean.TRUE.equals(jwtUtil.validateToken(accessToken, userDetails))) {
-                    UsernamePasswordAuthenticationToken usernamePasswordAuthenticationToken =
-                            new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
-                    usernamePasswordAuthenticationToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                    SecurityContextHolder.getContext().setAuthentication(usernamePasswordAuthenticationToken);
-                } else {
-                    throw new InvalidAuthException("Invalid or expired JWT token", TOKEN_401);
-                }
-            }
+            validateAndAuthenticate(accessToken, request);
         }
         filterChain.doFilter(request, response);
     }
@@ -85,10 +73,22 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String uri = request.getRequestURI();
         return "OPTIONS".equalsIgnoreCase(request.getMethod())   // preflight bypass
-                || "/error".equals(uri)         ;                     // error forward bypass
-//                || "/api/authentication/login".equals(uri)
-//                || uri.startsWith("/actuator/");
+                || "/error".equals(uri); // error forward bypass
     }
 
+    private void validateAndAuthenticate(String accessToken, HttpServletRequest request) {
+        String username;
+        username = jwtUtil.extractUsername(accessToken);
+        if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+            UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+            if (Boolean.FALSE.equals(jwtUtil.validateToken(accessToken, userDetails))) {
+                throw new InvalidAuthException("Invalid or expired token", TOKEN_401);
+            }
+            UsernamePasswordAuthenticationToken authToken =
+                    new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+            authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+            SecurityContextHolder.getContext().setAuthentication(authToken);
+        }
+    }
 
 }
